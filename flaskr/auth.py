@@ -64,3 +64,87 @@ def register():
 
         # return register template if GET request
         return render_template('auth/register.html')
+    
+
+    # Creates a Login view that will redirect user to home page
+    @bp.route('/login', methods=('GET', 'POST'))
+    def login():
+
+        # handle POST request
+        if request.method == 'POST':
+
+            # get username and password
+            username = request.form['username']
+            password = request.form['password']
+
+            # get db connection
+            db = get_db()
+            error = None
+
+            # validate username and password in the form
+            if not username:
+                error = "Please enter a valid username."
+            elif not password:
+                error = "Please enter a password."
+
+            # search db for user
+            user = db.execute(
+                'SELECT * FROM user where username = ?', (username).fetchone()
+            )
+
+            # check that user exists in db
+            if user is None:
+                error = "Incorrect username."
+            elif not check_password_hash(user['password'], password):
+                error = 'Incorrect password'
+
+            # store user id in session dict to be available for multiple requests
+            if error is None:
+                """
+                session is a dict that stores data across requests. When validation succeeds,
+                the user id is stored in a new session.
+                Difference between g and session: https://stackoverflow.com/questions/32909851/flask-session-vs-g#:~:text=No%2C%20g,g%20is%20cleared.
+
+                The data is stored in a cookie that is sent to the browser and the browser then
+                sends it back with subsequent requests. 
+
+                Flask securely signs the data so that it can't be tampered with.
+                """
+                session.clear()
+                session['user_id'] = user['id']
+                redirect(url_for('index'))
+
+
+        # handle GET request
+        return render_template('/auth/login.html')
+    
+
+    @bp.before_app_request
+    def load_logged_in_user():
+        """
+        This function runs before the view function no matter the URL requested. 
+        It checks if a user is logged in by checking if id is stored in session.
+        It gets the user's data from the database, and stores it on g.user which will last for 
+        the length of the request.
+
+        If a user is not logged in, or the id doesn't exist, g.user will be set to None.
+        """
+        user_id = session.get('user_id') # get user id stored in session dict
+
+        if user_id is None:
+            g.user = None
+        else:
+            g.user = get_db().execute(
+                'SELECT * FROM user where id = ?', (user_id)
+            ).fetchone()
+
+
+@bp.route('/logout')
+def logout():
+    """
+    To logout, the user id must be removed from session. And load_logged_in_user won't
+    load a user on subsequent requests.
+    """
+    session.clear()
+    return redirect(url_for('index'))
+
