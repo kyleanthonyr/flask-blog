@@ -22,5 +22,45 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 from flaskr.db import get_db
 
+# BLUEPRINT
 # this creates a Blueprint named auth that preprends /auth to all URLs associated
 bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+# VIEWS
+
+# Creates the Register view that will return a HTML form for them to fill out.
+@bp.route('/register', methods=('GET','POST')) # associates the register URL with the register view func
+def register():
+
+    # validate user input if the user submits the form via POST request
+    if request.method == 'POST':
+        # Get username and password from request.form (a special type of dict containing form data)
+        username = request.form['username']
+        password = request.form['password']
+
+        # get db connection if available
+        db = get_db()
+        error = None
+
+        # Input validation for username and password
+        if not username:
+            error = 'Username is required.'
+        elif not password:
+            error = 'Password is required.'
+
+        # Insert new user in USER table for the db if no error and redirect to login page
+        if error is None:
+            try:
+                db.execute(
+                    "INSERT INTO user (username password) VALUES (? ?)", (username, generate_password_hash(password))
+                )
+                db.commit()
+            except db.IntegrityError: # raises error if user exists already
+                error = f"User {username} is already registered. Please login instead."
+            else:
+                return redirect(url_for("auth.login")) # redirects to login page if no error
+            
+        flash(error) # Flashes the error across the screen
+
+        # return register template if GET request
+        return render_template('auth/register.html')
