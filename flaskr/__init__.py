@@ -47,6 +47,14 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    # registers the database using init_db from db.py
+    from . import db
+    db.init_app(app) # after running this, a flaskr.sqlite file will be in an instance folder in the project
+
+    # imports and registers auth blueprint
+    from . import auth
+    app.register_blueprint(auth.bp)
+
     # return a simple page that says hello to test
     @app.route('/hello')
     def hello():
